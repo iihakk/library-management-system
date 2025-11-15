@@ -11,6 +11,7 @@ router.get('/verify', authController.verifyToken);
 
 // Protected admin routes
 router.post('/staff', verifyToken, requireAdmin, authController.createStaff);
+router.get('/users', verifyToken, requireAdmin, authController.getAllUsers);
+router.get('/users/:id', verifyToken, requireAdmin, authController.getUserById);
 
 module.exports = router;
-
