@@ -10,6 +10,7 @@ router.get('/', holdController.getUserHolds);
 router.get('/:id', holdController.getHoldById);
 router.post('/', holdController.createHold);
 router.delete('/:id', holdController.cancelHold);
+router.post('/process-expired', holdController.processExpiredHolds);
 
 module.exports = router;
 

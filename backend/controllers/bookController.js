@@ -93,17 +93,21 @@ exports.getBookById = async (req, res) => {
 // Create book (admin only - add admin check if needed)
 exports.createBook = async (req, res) => {
   try {
-    const { isbn, title, author, publisher, publication_year, category, description, total_copies } = req.body;
+    const { isbn, title, author, publisher, publication_year, category, description, total_copies, book_type } = req.body;
 
     if (!title || !author) {
       return res.status(400).json({ error: 'Title and author are required' });
     }
 
+    // Validate book_type
+    const validBookTypes = ['physical', 'electronic', 'both'];
+    const bookType = book_type && validBookTypes.includes(book_type) ? book_type : 'physical';
+
     const available_copies = total_copies || 1;
 
     const [result] = await pool.execute(
-      'INSERT INTO books (isbn, title, author, publisher, publication_year, category, description, total_copies, available_copies) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [isbn || null, title, author, publisher || null, publication_year || null, category || null, description || null, total_copies || 1, available_copies]
+      'INSERT INTO books (isbn, title, author, publisher, publication_year, category, description, book_type, total_copies, available_copies) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [isbn || null, title, author, publisher || null, publication_year || null, category || null, description || null, bookType, total_copies || 1, available_copies]
     );
 
     const [newBook] = await pool.execute(
@@ -125,7 +129,7 @@ exports.createBook = async (req, res) => {
 exports.updateBook = async (req, res) => {
   try {
     const { id } = req.params;
-    const { isbn, title, author, publisher, publication_year, category, description, total_copies, available_copies } = req.body;
+    const { isbn, title, author, publisher, publication_year, category, description, total_copies, available_copies, book_type } = req.body;
 
     // Build update query dynamically
     const updates = [];
@@ -138,6 +142,13 @@ exports.updateBook = async (req, res) => {
     if (publication_year !== undefined) { updates.push('publication_year = ?'); params.push(publication_year); }
     if (category !== undefined) { updates.push('category = ?'); params.push(category); }
     if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+    if (book_type !== undefined) {
+      const validBookTypes = ['physical', 'electronic', 'both'];
+      if (validBookTypes.includes(book_type)) {
+        updates.push('book_type = ?');
+        params.push(book_type);
+      }
+    }
     if (total_copies !== undefined) { updates.push('total_copies = ?'); params.push(total_copies); }
     if (available_copies !== undefined) { updates.push('available_copies = ?'); params.push(available_copies); }
 

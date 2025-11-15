@@ -6,6 +6,7 @@ const authRoutes = require('./routes/authRoutes');
 const bookRoutes = require('./routes/bookRoutes');
 const loanRoutes = require('./routes/loanRoutes');
 const holdRoutes = require('./routes/holdRoutes');
+const fineRoutes = require('./routes/fineRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -60,6 +61,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/loans', loanRoutes);
 app.use('/api/holds', holdRoutes);
+app.use('/api/fines', fineRoutes);
 
 // 404 handler
 app.use((req, res) => {
