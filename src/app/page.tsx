@@ -12,6 +12,12 @@ export default function Home() {
             </div>
             <div className="flex items-center space-x-4">
               <Link
+                href="/catalog"
+                className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                Catalog
+              </Link>
+              <Link
                 href="/login"
                 className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
@@ -42,18 +48,18 @@ export default function Home() {
           <div className="mt-5 max-w-md mx-auto sm:flex sm:justify-center md:mt-8">
             <div className="rounded-md shadow">
               <Link
-                href="/signup"
+                href="/catalog"
                 className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 md:py-4 md:text-lg md:px-10"
               >
-                Get Started
+                Browse Catalog
               </Link>
             </div>
             <div className="mt-3 rounded-md shadow sm:mt-0 sm:ml-3">
               <Link
-                href="/login"
+                href="/signup"
                 className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-primary-600 bg-white hover:bg-gray-50 md:py-4 md:text-lg md:px-10"
               >
-                Sign In
+                Get Started
               </Link>
             </div>
           </div>
