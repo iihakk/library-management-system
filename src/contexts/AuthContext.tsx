@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
+const API_BASE_URL = 'http://localhost:5000/api';
+
 interface User {
   uid: string;
   email: string | null;
@@ -44,79 +46,113 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signup = async (email: string, password: string, name: string) => {
     setLoading(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, name }),
+      });
 
-    // Check for duplicate email (mock)
-    const existingUser = localStorage.getItem('demo_user_' + email);
-    if (existingUser) {
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create account');
+      }
+
+      // Store token
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      }
+
+      setUser(data.user);
       setLoading(false);
-      throw new Error('Email already registered - Please sign in or use different email');
+    } catch (error: any) {
+      setLoading(false);
+      throw error;
     }
-
-    // Create mock user
-    const newUser = {
-      uid: Math.random().toString(36).substr(2, 9),
-      email,
-      displayName: name,
-      emailVerified: false,
-    };
-
-    localStorage.setItem('demo_user_' + email, JSON.stringify({ ...newUser, password }));
-    setLoading(false);
   };
 
   const login = async (email: string, password: string) => {
     setLoading(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    const storedUser = localStorage.getItem('demo_user_' + email);
+      const data = await response.json();
 
-    if (!storedUser) {
+      if (!response.ok) {
+        throw new Error(data.error || 'Invalid email or password');
+      }
+
+      // Store token
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      }
+
+      setUser(data.user);
       setLoading(false);
-      throw new Error('Invalid email or password');
-    }
-
-    const userData = JSON.parse(storedUser);
-
-    if (userData.password !== password) {
+    } catch (error: any) {
       setLoading(false);
-      throw new Error('Invalid email or password');
+      throw error;
     }
-
-    setUser({
-      uid: userData.uid,
-      email: userData.email,
-      displayName: userData.displayName,
-      emailVerified: userData.emailVerified,
-    });
-
-    localStorage.setItem('demo_current_user', JSON.stringify(userData));
-    setLoading(false);
   };
 
   const logout = async () => {
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setUser(null);
-    localStorage.removeItem('demo_current_user');
-    setLoading(false);
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('auth_token');
+      setUser(null);
+      setLoading(false);
+    }
   };
 
   // Check for existing session on mount
   React.useEffect(() => {
-    const currentUser = localStorage.getItem('demo_current_user');
-    if (currentUser) {
-      const userData = JSON.parse(currentUser);
-      setUser({
-        uid: userData.uid,
-        email: userData.email,
-        displayName: userData.displayName,
-        emailVerified: userData.emailVerified,
-      });
-    }
+    const verifySession = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/verify`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setUser(data.user);
+          } else {
+            localStorage.removeItem('auth_token');
+          }
+        } catch (error) {
+          console.error('Session verification error:', error);
+          localStorage.removeItem('auth_token');
+        }
+      }
+    };
+
+    verifySession();
   }, []);
 
   const value: AuthContextType = {

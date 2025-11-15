@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
 export default function DashboardPage() {
@@ -114,9 +115,12 @@ export default function DashboardPage() {
                   <p className="text-sm text-gray-600 mb-3">
                     Search and browse available library items
                   </p>
-                  <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                  <Link
+                    href="/catalog"
+                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                  >
                     Go to Catalog →
-                  </button>
+                  </Link>
                 </div>
 
                 <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
