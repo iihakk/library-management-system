@@ -4,7 +4,7 @@ import { useState, useEffect, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5001/api';
 
 interface Book {
   id: number;
