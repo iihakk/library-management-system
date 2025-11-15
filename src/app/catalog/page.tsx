@@ -4,7 +4,7 @@ import { useState, useEffect, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 interface Book {
   id: number;
@@ -15,6 +15,7 @@ interface Book {
   publication_year?: number;
   category?: string;
   description?: string;
+  book_type?: 'physical' | 'electronic' | 'both';
   total_copies: number;
   available_copies: number;
 }
@@ -106,6 +107,36 @@ export default function CatalogPage() {
   const handleAuthorChange = (e: ChangeEvent<HTMLInputElement>) => {
     setSelectedAuthor(e.target.value);
     setPagination((prev) => ({ ...prev, page: 1 }));
+  };
+
+  const handlePlaceHold = async (bookId: number) => {
+    if (!user) {
+      setError('Please log in to place a hold');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/holds`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ book_id: bookId })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setError('');
+        alert('Hold placed successfully! You have 48 hours to pick up the book.');
+      } else {
+        setError(data.error || 'Failed to place hold');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to place hold');
+    }
   };
 
   const clearFilters = () => {
@@ -312,11 +343,24 @@ export default function CatalogPage() {
                           </div>
                         </div>
 
-                        {book.category && (
-                          <span className="inline-block px-2 py-1 text-xs font-medium text-primary-700 bg-primary-100 rounded mb-3">
-                            {book.category}
-                          </span>
-                        )}
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {book.category && (
+                            <span className="inline-block px-2 py-1 text-xs font-medium text-primary-700 bg-primary-100 rounded">
+                              {book.category}
+                            </span>
+                          )}
+                          {book.book_type && (
+                            <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
+                              book.book_type === 'electronic' ? 'bg-blue-100 text-blue-800' :
+                              book.book_type === 'both' ? 'bg-purple-100 text-purple-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {book.book_type === 'electronic' ? '📱 Electronic' :
+                               book.book_type === 'both' ? '📚 Both' :
+                               '📖 Physical'}
+                            </span>
+                          )}
+                        </div>
 
                         {book.description && (
                           <p className="text-sm text-gray-600 mb-4 line-clamp-3">
@@ -343,7 +387,7 @@ export default function CatalogPage() {
                         </div>
 
                         <div className="mt-4 pt-4 border-t border-gray-200">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between mb-3">
                             <div>
                               <p className="text-sm text-gray-600">
                                 <span className="font-medium text-gray-900">
@@ -362,6 +406,28 @@ export default function CatalogPage() {
                               </span>
                             )}
                           </div>
+                          
+                          {/* Action Buttons */}
+                          {user && (
+                            <div className="flex gap-2">
+                              {(book.book_type === 'physical' || book.book_type === 'both') && book.available_copies === 0 && (
+                                <button
+                                  onClick={() => handlePlaceHold(book.id)}
+                                  className="flex-1 px-3 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
+                                >
+                                  Place Hold
+                                </button>
+                              )}
+                              {book.book_type === 'electronic' && (
+                                <button
+                                  className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                                  disabled
+                                >
+                                  Borrow Electronically
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

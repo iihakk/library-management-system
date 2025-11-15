@@ -3,9 +3,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 // Generate JWT token
-const generateToken = (userId, email) => {
+const generateToken = (userId, email, role) => {
   return jwt.sign(
-    { userId, email },
+    { userId, email, role },
     process.env.JWT_SECRET || 'your-secret-key-change-this-in-production',
     { expiresIn: '7d' }
   );
@@ -14,7 +14,14 @@ const generateToken = (userId, email) => {
 // Signup
 exports.signup = async (req, res) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, role } = req.body;
+
+    // SECURITY: Explicitly reject any role parameter - users can only sign up as 'user'
+    if (role && role !== 'user') {
+      return res.status(403).json({ 
+        error: 'Invalid role. Only regular user accounts can be created through signup.' 
+      });
+    }
 
     // Validation
     if (!email || !password || !name) {
@@ -41,14 +48,17 @@ exports.signup = async (req, res) => {
     // Generate unique ID
     const uid = Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 
-    // Insert user
+    // SECURITY: Always set role to 'user' - never allow admin/staff creation through signup
+    const userRole = 'user';
+
+    // Insert user (always 'user' role - admin/staff must be created by existing admins)
     const [result] = await pool.execute(
-      'INSERT INTO users (uid, email, password, display_name, email_verified) VALUES (?, ?, ?, ?, ?)',
-      [uid, email, hashedPassword, name, false]
+      'INSERT INTO users (uid, email, password, display_name, email_verified, role) VALUES (?, ?, ?, ?, ?, ?)',
+      [uid, email, hashedPassword, name, false, userRole]
     );
 
     // Generate token
-    const token = generateToken(result.insertId, email);
+    const token = generateToken(result.insertId, email, 'user');
 
     // Return user data (without password)
     res.status(201).json({
@@ -57,7 +67,8 @@ exports.signup = async (req, res) => {
         uid,
         email,
         displayName: name,
-        emailVerified: false
+        emailVerified: false,
+        role: 'user'
       },
       token
     });
@@ -81,7 +92,7 @@ exports.login = async (req, res) => {
 
     // Find user
     const [users] = await pool.execute(
-      'SELECT id, uid, email, password, display_name, email_verified FROM users WHERE email = ?',
+      'SELECT id, uid, email, password, display_name, email_verified, role FROM users WHERE email = ?',
       [email]
     );
 
@@ -103,7 +114,7 @@ exports.login = async (req, res) => {
     }
 
     // Generate token
-    const token = generateToken(user.id, user.email);
+    const token = generateToken(user.id, user.email, user.role || 'user');
 
     // Return user data (without password)
     res.json({
@@ -111,7 +122,8 @@ exports.login = async (req, res) => {
         uid: user.uid,
         email: user.email,
         displayName: user.display_name,
-        emailVerified: user.email_verified
+        emailVerified: user.email_verified,
+        role: user.role || 'user'
       },
       token
     });
@@ -149,7 +161,7 @@ exports.verifyToken = async (req, res) => {
 
     // Get user from database
     const [users] = await pool.execute(
-      'SELECT id, uid, email, display_name, email_verified FROM users WHERE id = ?',
+      'SELECT id, uid, email, display_name, email_verified, role FROM users WHERE id = ?',
       [decoded.userId]
     );
 
@@ -164,12 +176,66 @@ exports.verifyToken = async (req, res) => {
         uid: user.uid,
         email: user.email,
         displayName: user.display_name,
-        emailVerified: user.email_verified
+        emailVerified: user.email_verified,
+        role: user.role || 'user'
       }
     });
   } catch (error) {
     console.error('Token verification error:', error);
     res.status(401).json({ error: 'Invalid or expired token' });
+  }
+};
+
+// Create staff member (admin only)
+exports.createStaff = async (req, res) => {
+  try {
+    const { email, password, name } = req.body;
+
+    // Validation
+    if (!email || !password || !name) {
+      return res.status(400).json({ 
+        error: 'Please provide email, password, and name' 
+      });
+    }
+
+    // Check if email already exists
+    const [existingUsers] = await pool.execute(
+      'SELECT id FROM users WHERE email = ?',
+      [email]
+    );
+
+    if (existingUsers.length > 0) {
+      return res.status(400).json({ 
+        error: 'Email already registered' 
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Generate unique ID
+    const uid = Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+
+    // Insert staff member
+    const [result] = await pool.execute(
+      'INSERT INTO users (uid, email, password, display_name, email_verified, role) VALUES (?, ?, ?, ?, ?, ?)',
+      [uid, email, hashedPassword, name, true, 'staff']
+    );
+
+    // Return staff data (without password)
+    res.status(201).json({
+      message: 'Staff member created successfully',
+      user: {
+        uid,
+        email,
+        displayName: name,
+        emailVerified: true,
+        role: 'staff'
+      }
+    });
+  } catch (error) {
+    console.error('Create staff error:', error);
+    res.status(500).json({ error: 'Failed to create staff member. Please try again.' });
   }
 };
 
