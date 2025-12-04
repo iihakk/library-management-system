@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 interface Loan {
   id: number;
@@ -23,11 +23,16 @@ interface Loan {
 interface Hold {
   id: number;
   book_id: number;
-  title: string;  // Backend returns title, not book_title
-  author: string; // Backend returns author, not book_author
+  title?: string;
+  book_title?: string;
+  author?: string;
+  book_author?: string;
   hold_date: string;
   expiry_date: string | null;
+  expiry_datetime: string | null;
   status: 'pending' | 'available' | 'cancelled' | 'expired';
+  fee_amount?: number;
+  fee_applied?: boolean;
   queue_position?: number;
   total_queue?: number;
 }
@@ -35,9 +40,12 @@ interface Hold {
 interface Fine {
   id: number;
   amount: number;
-  type: 'overdue' | 'damage' | 'lost';
+  type: 'hold_expiry' | 'overdue' | 'damage' | 'lost';
   status: 'pending' | 'paid' | 'waived';
   loan_id: number | null;
+  hold_id: number | null;
+  book_title?: string;
+  description?: string;
   created_at: string;
 }
 
@@ -51,6 +59,20 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Redirect based on role
+  useEffect(() => {
+    if (user) {
+      if (user.role === 'admin') {
+        router.push('/dashboard/admin');
+        return;
+      } else if (user.role === 'staff') {
+        router.push('/dashboard/staff');
+        return;
+      }
+      // Regular users stay on this page
+    }
+  }, [user, router]);
+
   // Fetch user data
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -61,11 +83,14 @@ export default function DashboardPage() {
       }
 
       // Fetch loans, holds, and fines in parallel
-      const [loansRes, holdsRes] = await Promise.all([
+      const [loansRes, holdsRes, finesRes] = await Promise.all([
         fetch(`${API_BASE_URL}/loans`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch(`${API_BASE_URL}/holds`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_BASE_URL}/fines`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
@@ -82,8 +107,10 @@ export default function DashboardPage() {
         setHolds(Array.isArray(holdsData) ? holdsData : holdsData.holds || []);
       }
 
-      // Mock fines for now (will be implemented later)
-      setFines([]);
+      if (finesRes.ok) {
+        const finesData = await finesRes.json();
+        setFines(finesData.fines || []);
+      }
 
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err);
@@ -95,7 +122,39 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardData();
+    
+    // Refresh data every 30 seconds to update countdown timers
+    const interval = setInterval(() => {
+      fetchDashboardData();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
+
+  // Calculate remaining time for hold (in milliseconds)
+  const getHoldRemainingTime = (expiryDatetime: string | null): number => {
+    if (!expiryDatetime) return 0;
+    const expiry = new Date(expiryDatetime);
+    const now = new Date();
+    return Math.max(0, expiry.getTime() - now.getTime());
+  };
+
+  // Format remaining time for display
+  const formatRemainingTime = (milliseconds: number): string => {
+    if (milliseconds <= 0) return 'Expired';
+    
+    const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+    const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${seconds}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -127,6 +186,39 @@ export default function DashboardPage() {
     if (daysRemaining === 0) return 'Due today';
     if (daysRemaining === 1) return 'Due tomorrow';
     return `${daysRemaining} days remaining`;
+  };
+
+  // Hold Countdown Component
+  const HoldCountdown = ({ expiryDatetime }: { expiryDatetime: string }) => {
+    const [remainingTime, setRemainingTime] = useState(getHoldRemainingTime(expiryDatetime));
+
+    useEffect(() => {
+      const interval = setInterval(() => {
+        const time = getHoldRemainingTime(expiryDatetime);
+        setRemainingTime(time);
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }, [expiryDatetime]);
+
+    const formatted = formatRemainingTime(remainingTime);
+    const isExpiringSoon = remainingTime < 2 * 60 * 60 * 1000; // Less than 2 hours
+    const isExpired = remainingTime <= 0;
+
+    return (
+      <div className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-semibold ${
+        isExpired 
+          ? 'bg-red-100 text-red-800 border-2 border-red-300' 
+          : isExpiringSoon 
+          ? 'bg-orange-100 text-orange-800 border-2 border-orange-300' 
+          : 'bg-blue-100 text-blue-800 border-2 border-blue-300'
+      }`}>
+        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        {formatted}
+      </div>
+    );
   };
 
   // Handle renew
@@ -338,7 +430,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-1">Total Fines</p>
-                  <p className="text-3xl font-bold text-gray-900">${totalFines.toFixed(2)}</p>
+                  <p className="text-3xl font-bold text-gray-900">{totalFines.toFixed(2)} EGP</p>
                 </div>
                 <div className="bg-yellow-100 rounded-full p-3">
                   <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -514,9 +606,9 @@ export default function DashboardPage() {
                               </div>
                               <div className="flex-1">
                                 <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                                  {hold.title}
+                                  {hold.title || hold.book_title}
                                 </h3>
-                                <p className="text-sm text-gray-600 mb-3">by {hold.author}</p>
+                                <p className="text-sm text-gray-600 mb-3">by {hold.author || hold.book_author}</p>
 
                                 <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                                   <div>
@@ -539,12 +631,27 @@ export default function DashboardPage() {
                                   )}
                                 </div>
 
+                                {/* Countdown Timer */}
+                                {hold.expiry_datetime && (hold.status === 'pending' || hold.status === 'available') && (
+                                  <div className="mb-3">
+                                    <p className="text-sm text-gray-500 mb-1">Time remaining to pick up:</p>
+                                    <HoldCountdown expiryDatetime={hold.expiry_datetime} />
+                                  </div>
+                                )}
+
                                 {hold.status === 'available' ? (
                                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200">
                                     <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                     </svg>
                                     Ready for pickup!
+                                  </span>
+                                ) : hold.status === 'expired' ? (
+                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-200">
+                                    <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                    </svg>
+                                    Expired {hold.fee_applied && `- Fee: ${hold.fee_amount} EGP`}
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
@@ -593,7 +700,7 @@ export default function DashboardPage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-sm text-yellow-800 mb-1">Total Amount Due</p>
-                      <p className="text-4xl font-bold text-yellow-900">${totalFines.toFixed(2)}</p>
+                      <p className="text-4xl font-bold text-yellow-900">{totalFines.toFixed(2)} EGP</p>
                       <p className="text-sm text-yellow-700 mt-2">
                         You have {fines.filter(f => f.status === 'pending').length} unpaid fine(s)
                       </p>

@@ -1,34 +1,77 @@
+'use client';
+
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
+  const { user, logout } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100">
       {/* Navigation */}
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900">ULMS</h1>
-            </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-8">
+              <Link href="/" className="text-xl font-bold text-gray-900">
+                ULMS
+              </Link>
               <Link
                 href="/catalog"
-                className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                className="text-gray-600 hover:text-gray-900 px-3 py-2 text-sm font-medium transition-colors"
               >
                 Catalog
               </Link>
-              <Link
-                href="/login"
-                className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/signup"
-                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-              >
-                Sign Up
-              </Link>
+              {user && (
+                <Link
+                  href="/dashboard"
+                  className="text-gray-600 hover:text-gray-900 px-3 py-2 text-sm font-medium transition-colors"
+                >
+                  Dashboard
+                </Link>
+              )}
+            </div>
+            <div className="flex items-center space-x-4">
+              {user ? (
+                <>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-gray-900">{user.displayName || user.email}</p>
+                    <p className="text-xs text-gray-500">{user.email}</p>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                  >
+                    Sign Up
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>

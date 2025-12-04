@@ -10,10 +10,12 @@ CREATE TABLE IF NOT EXISTS users (
   password VARCHAR(255) NOT NULL,
   display_name VARCHAR(255) NOT NULL,
   email_verified BOOLEAN DEFAULT FALSE,
+  role ENUM('user', 'staff', 'admin') DEFAULT 'user',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_email (email),
-  INDEX idx_uid (uid)
+  INDEX idx_uid (uid),
+  INDEX idx_role (role)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Books table
@@ -26,6 +28,7 @@ CREATE TABLE IF NOT EXISTS books (
   publication_year INT,
   category VARCHAR(100),
   description TEXT,
+  book_type ENUM('physical', 'electronic', 'both') DEFAULT 'physical',
   total_copies INT DEFAULT 1,
   available_copies INT DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -59,8 +62,11 @@ CREATE TABLE IF NOT EXISTS holds (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   book_id INT NOT NULL,
-  hold_date DATE NOT NULL,
+  hold_date DATETIME NOT NULL,
   expiry_date DATE,
+  expiry_datetime DATETIME NOT NULL,
+  fee_amount DECIMAL(10, 2) DEFAULT 0.00,
+  fee_applied BOOLEAN DEFAULT FALSE,
   status ENUM('pending', 'available', 'cancelled', 'expired') DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -68,6 +74,27 @@ CREATE TABLE IF NOT EXISTS holds (
   FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
   INDEX idx_user_id (user_id),
   INDEX idx_book_id (book_id),
-  INDEX idx_status (status)
+  INDEX idx_status (status),
+  INDEX idx_expiry_datetime (expiry_datetime)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Fines table
+CREATE TABLE IF NOT EXISTS fines (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  hold_id INT NULL,
+  loan_id INT NULL,
+  amount DECIMAL(10, 2) NOT NULL,
+  type ENUM('hold_expiry', 'overdue', 'damage', 'lost') DEFAULT 'hold_expiry',
+  status ENUM('pending', 'paid', 'waived') DEFAULT 'pending',
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (hold_id) REFERENCES holds(id) ON DELETE SET NULL,
+  FOREIGN KEY (loan_id) REFERENCES loans(id) ON DELETE SET NULL,
+  INDEX idx_user_id (user_id),
+  INDEX idx_status (status),
+  INDEX idx_type (type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

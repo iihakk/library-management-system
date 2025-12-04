@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "setup:admin": "node scripts/create-admin-user.js",
+    "migrate:role": "node scripts/add-role-migration.js",
+    "migrate:book-type": "node scripts/add-book-type-migration.js"
   },
   "keywords": [],
   "author": "",
