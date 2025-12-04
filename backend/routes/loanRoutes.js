@@ -9,6 +9,7 @@ router.use(verifyToken);
 router.get('/', loanController.getUserLoans);
 router.get('/:id', loanController.getLoanById);
 router.post('/', loanController.createLoan);
+router.put('/:id/renew', loanController.renewLoan);
 router.put('/:id/return', loanController.returnLoan);
 
 module.exports = router;

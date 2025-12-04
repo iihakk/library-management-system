@@ -113,6 +113,60 @@ exports.createLoan = async (req, res) => {
   }
 };
 
+// Renew loan
+exports.renewLoan = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Get loan
+    const [loans] = await pool.execute(
+      'SELECT * FROM loans WHERE id = ? AND user_id = ?',
+      [id, userId]
+    );
+
+    if (loans.length === 0) {
+      return res.status(404).json({ error: 'Loan not found' });
+    }
+
+    const loan = loans[0];
+
+    if (loan.status !== 'active') {
+      return res.status(400).json({ error: 'Can only renew active loans' });
+    }
+
+    // Check if loan is overdue
+    const today = new Date();
+    const dueDate = new Date(loan.due_date);
+    if (today > dueDate) {
+      return res.status(400).json({ error: 'Cannot renew overdue books. Please return the book and pay any fines.' });
+    }
+
+    // Extend due date by 14 days
+    const newDueDate = new Date(loan.due_date);
+    newDueDate.setDate(newDueDate.getDate() + 14);
+
+    await pool.execute(
+      'UPDATE loans SET due_date = ? WHERE id = ?',
+      [newDueDate, id]
+    );
+
+    // Get updated loan
+    const [updatedLoan] = await pool.execute(
+      `SELECT l.*, b.title, b.author, b.isbn
+       FROM loans l
+       JOIN books b ON l.book_id = b.id
+       WHERE l.id = ?`,
+      [id]
+    );
+
+    res.json(updatedLoan[0]);
+  } catch (error) {
+    console.error('Renew loan error:', error);
+    res.status(500).json({ error: 'Failed to renew loan' });
+  }
+};
+
 // Return book
 exports.returnLoan = async (req, res) => {
   try {

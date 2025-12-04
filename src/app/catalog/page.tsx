@@ -30,9 +30,11 @@ export default function CatalogPage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedAuthor, setSelectedAuthor] = useState('');
+  const [borrowingBookId, setBorrowingBookId] = useState<number | null>(null);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
     limit: 12,
@@ -123,6 +125,55 @@ export default function CatalogPage() {
       }
     });
     return Array.from(categories).sort();
+  };
+
+  const handleBorrow = async (bookId: number, bookTitle: string) => {
+    if (!user) {
+      setError('Please login to borrow books');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to borrow "${bookTitle}"?\n\n` +
+      `Loan period: 14 days\n` +
+      `You will be responsible for returning it on time.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setBorrowingBookId(bookId);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/loans`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ book_id: bookId })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to borrow book');
+      }
+
+      setSuccessMessage('Book borrowed successfully! Due date: ' + new Date(data.due_date).toLocaleDateString() + '. Check your dashboard.');
+      setTimeout(() => setSuccessMessage(''), 5000);
+
+      // Refresh books to update available copies
+      fetchBooks();
+    } catch (err: any) {
+      setError(err.message || 'Failed to borrow book');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setBorrowingBookId(null);
+    }
   };
 
   return (
@@ -251,10 +302,23 @@ export default function CatalogPage() {
           )}
         </div>
 
+        {/* Success Message */}
+        {successMessage && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 flex items-start">
+            <svg className="w-5 h-5 text-green-600 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <p className="text-green-800 font-medium">{successMessage}</p>
+          </div>
+        )}
+
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-800">{error}</p>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-start">
+            <svg className="w-5 h-5 text-red-600 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <p className="text-red-800 font-medium">{error}</p>
           </div>
         )}
 
@@ -343,7 +407,7 @@ export default function CatalogPage() {
                         </div>
 
                         <div className="mt-4 pt-4 border-t border-gray-200">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between mb-3">
                             <div>
                               <p className="text-sm text-gray-600">
                                 <span className="font-medium text-gray-900">
@@ -362,6 +426,40 @@ export default function CatalogPage() {
                               </span>
                             )}
                           </div>
+
+                          {user && book.available_copies > 0 && (
+                            <button
+                              onClick={() => handleBorrow(book.id, book.title)}
+                              disabled={borrowingBookId === book.id}
+                              className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              {borrowingBookId === book.id ? (
+                                <>
+                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Borrowing...
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                  </svg>
+                                  Borrow Book
+                                </>
+                              )}
+                            </button>
+                          )}
+
+                          {!user && book.available_copies > 0 && (
+                            <Link
+                              href="/login"
+                              className="w-full inline-flex justify-center items-center px-4 py-2 border border-primary-600 text-sm font-medium rounded-md text-primary-600 bg-white hover:bg-primary-50 transition-colors"
+                            >
+                              Login to Borrow
+                            </Link>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -11,18 +11,20 @@ const API_BASE_URL = 'http://localhost:5001/api';
 interface Loan {
   id: number;
   book_id: number;
-  book_title: string;
-  book_author: string;
+  title: string;  // Backend returns title, not book_title
+  author: string; // Backend returns author, not book_author
+  isbn?: string;
   loan_date: string;
   due_date: string;
+  return_date?: string;
   status: 'active' | 'returned' | 'overdue';
 }
 
 interface Hold {
   id: number;
   book_id: number;
-  book_title: string;
-  book_author: string;
+  title: string;  // Backend returns title, not book_title
+  author: string; // Backend returns author, not book_author
   hold_date: string;
   expiry_date: string | null;
   status: 'pending' | 'available' | 'cancelled' | 'expired';
@@ -70,12 +72,14 @@ export default function DashboardPage() {
 
       if (loansRes.ok) {
         const loansData = await loansRes.json();
-        setLoans(loansData.loans || []);
+        // Backend returns array directly, not wrapped in object
+        setLoans(Array.isArray(loansData) ? loansData : loansData.loans || []);
       }
 
       if (holdsRes.ok) {
         const holdsData = await holdsRes.json();
-        setHolds(holdsData.holds || []);
+        // Backend returns array directly, not wrapped in object
+        setHolds(Array.isArray(holdsData) ? holdsData : holdsData.holds || []);
       }
 
       // Mock fines for now (will be implemented later)
@@ -126,7 +130,18 @@ export default function DashboardPage() {
   };
 
   // Handle renew
-  const handleRenew = async (loanId: number) => {
+  const handleRenew = async (loanId: number, bookTitle: string) => {
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      `Request renewal for "${bookTitle}"?\n\n` +
+      `Note: Renewal requests are sent to the admin panel for approval.\n` +
+      `You will be notified once your request is reviewed.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(`${API_BASE_URL}/loans/${loanId}/renew`, {
@@ -135,12 +150,12 @@ export default function DashboardPage() {
       });
 
       if (response.ok) {
-        setSuccessMessage('Book renewed successfully!');
-        setTimeout(() => setSuccessMessage(''), 3000);
+        setSuccessMessage('Renewal request submitted successfully! Your request will be reviewed by the admin. You will be notified of the decision.');
+        setTimeout(() => setSuccessMessage(''), 5000);
         fetchDashboardData(); // Refresh data
       } else {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to renew');
+        throw new Error(data.error || 'Failed to submit renewal request');
       }
     } catch (err: any) {
       setError(err.message);
@@ -388,9 +403,9 @@ export default function DashboardPage() {
                                 </div>
                                 <div className="flex-1">
                                   <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                                    {loan.book_title}
+                                    {loan.title}
                                   </h3>
-                                  <p className="text-sm text-gray-600 mb-3">by {loan.book_author}</p>
+                                  <p className="text-sm text-gray-600 mb-3">by {loan.author}</p>
 
                                   <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
@@ -429,13 +444,13 @@ export default function DashboardPage() {
 
                             <div className="flex flex-col gap-2 ml-4">
                               <button
-                                onClick={() => handleRenew(loan.id)}
+                                onClick={() => handleRenew(loan.id, loan.title)}
                                 className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
                               >
                                 <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </svg>
-                                Renew
+                                Request Renewal
                               </button>
                               <button
                                 onClick={() => handleReturn(loan.id)}
@@ -499,9 +514,9 @@ export default function DashboardPage() {
                               </div>
                               <div className="flex-1">
                                 <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                                  {hold.book_title}
+                                  {hold.title}
                                 </h3>
-                                <p className="text-sm text-gray-600 mb-3">by {hold.book_author}</p>
+                                <p className="text-sm text-gray-600 mb-3">by {hold.author}</p>
 
                                 <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                                   <div>
