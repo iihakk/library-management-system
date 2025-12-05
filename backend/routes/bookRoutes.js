@@ -5,6 +5,7 @@ const { verifyToken, requireAdmin } = require('../middleware/authMiddleware');
 
 // Public routes
 router.get('/', bookController.getAllBooks);
+router.get('/suggestions', bookController.getSearchSuggestions);
 router.get('/:id', bookController.getBookById);
 
 // Protected routes (admin only)

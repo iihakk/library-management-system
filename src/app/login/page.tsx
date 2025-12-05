@@ -33,7 +33,6 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Validation
       if (!formData.email.trim() || !formData.password) {
         setError('Please enter both email and password');
         setLoading(false);
@@ -41,10 +40,19 @@ export default function LoginPage() {
       }
 
       // Attempt login (LIB-09 FR1)
-      await login(formData.email, formData.password);
-
-      // Success - redirect to dashboard
-      router.push('/dashboard');
+      try {
+        await login(formData.email, formData.password);
+        // Success - redirect to dashboard
+        router.push('/dashboard');
+      } catch (loginError: any) {
+        // Check if email verification is required
+        if (loginError.message && loginError.message.includes('Email not verified')) {
+          // Redirect to verification page
+          router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+          return;
+        }
+        throw loginError; // Re-throw other errors
+      }
     } catch (error: any) {
       // LIB-09 FR2: Display generic error message
       setError(error.message || 'Invalid email or password');
@@ -145,9 +153,9 @@ export default function LoginPage() {
             </div>
 
             <div className="text-sm">
-              <a href="#" className="font-medium text-primary-600 hover:text-primary-500">
+              <Link href="/forgot-password" className="font-medium text-primary-600 hover:text-primary-500">
                 Forgot your password?
-              </a>
+              </Link>
             </div>
           </div>
 

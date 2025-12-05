@@ -4,28 +4,25 @@ require('dotenv').config();
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || 'root',
   database: process.env.DB_NAME || 'library_system',
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 10,  
   queueLimit: 0
 };
 
-// Only add password if it's set in env
 if (process.env.DB_PASSWORD) {
   dbConfig.password = process.env.DB_PASSWORD;
 }
 
-// Create connection pool
 const pool = mysql.createPool(dbConfig);
-
-// Test connection
 pool.getConnection()
   .then(connection => {
-    console.log('✅ Database connected successfully');
+    console.log('Database connected successfully');
     connection.release();
   })
   .catch(err => {
-    console.error('❌ Database connection error:', err.message);
+    console.error('Database connection error:', err.message);
   });
 
 module.exports = pool;

@@ -1,9 +1,13 @@
 const pool = require('../config/database');
+const fineService = require('../services/fineService');
 
 // Get all loans for a user
 exports.getUserLoans = async (req, res) => {
   try {
     const userId = req.user.id;
+
+    // Check and create fines for overdue loans
+    await fineService.checkAndCreateOverdueFines();
 
     const [loans] = await pool.execute(
       `SELECT l.*, b.title, b.author, b.isbn 
@@ -14,7 +18,26 @@ exports.getUserLoans = async (req, res) => {
       [userId]
     );
 
-    res.json(loans);
+    // Add fine information to each loan
+    const loansWithFines = await Promise.all(loans.map(async (loan) => {
+      const fineInfo = fineService.calculateLoanFine(loan);
+      
+      // Get existing pending fine for this loan
+      const [existingFines] = await pool.execute(
+        'SELECT id, amount, status FROM fines WHERE loan_id = ? AND status = "pending" AND type = "overdue"',
+        [loan.id]
+      );
+
+      return {
+        ...loan,
+        daysOverdue: fineInfo.daysOverdue,
+        estimatedFine: fineInfo.amount,
+        hasPendingFine: existingFines.length > 0,
+        fineId: existingFines.length > 0 ? existingFines[0].id : null
+      };
+    }));
+
+    res.json(loansWithFines);
   } catch (error) {
     console.error('Get loans error:', error);
     res.status(500).json({ error: 'Failed to fetch loans' });
@@ -51,6 +74,7 @@ exports.createLoan = async (req, res) => {
   try {
     const { book_id } = req.body;
     const userId = req.user.id;
+    const userRole = req.user.role;
 
     if (!book_id) {
       return res.status(400).json({ error: 'Book ID is required' });
@@ -66,7 +90,26 @@ exports.createLoan = async (req, res) => {
       return res.status(404).json({ error: 'Book not found' });
     }
 
-    if (books[0].available_copies <= 0) {
+    const book = books[0];
+    const bookType = book.book_type || 'physical';
+
+    // Regular users can only borrow electronic books directly
+    // Physical books must be borrowed through staff
+    if (userRole !== 'staff' && userRole !== 'admin') {
+      if (bookType === 'physical') {
+        return res.status(403).json({ 
+          error: 'Physical books must be borrowed through library staff. Please place a reservation instead.' 
+        });
+      }
+      // Allow electronic and both types for regular users
+      if (bookType !== 'electronic' && bookType !== 'both') {
+        return res.status(403).json({ 
+          error: 'This book type cannot be borrowed directly. Please contact library staff.' 
+        });
+      }
+    }
+
+    if (book.available_copies <= 0) {
       return res.status(400).json({ error: 'Book is not available' });
     }
 

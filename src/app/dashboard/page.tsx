@@ -45,8 +45,10 @@ interface Fine {
   loan_id: number | null;
   hold_id: number | null;
   book_title?: string;
+  book_author?: string;
   description?: string;
   created_at: string;
+  paid_at?: string | null;
 }
 
 export default function DashboardPage() {
@@ -55,9 +57,11 @@ export default function DashboardPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [holds, setHolds] = useState<Hold[]>([]);
   const [fines, setFines] = useState<Fine[]>([]);
+  const [totalPending, setTotalPending] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [payingFineId, setPayingFineId] = useState<number | null>(null);
 
   // Redirect based on role
   useEffect(() => {
@@ -110,6 +114,7 @@ export default function DashboardPage() {
       if (finesRes.ok) {
         const finesData = await finesRes.json();
         setFines(finesData.fines || []);
+        setTotalPending(finesData.totalPending || 0);
       }
 
     } catch (err: any) {
@@ -255,26 +260,31 @@ export default function DashboardPage() {
     }
   };
 
-  // Handle return
-  const handleReturn = async (loanId: number) => {
+  // Books must be returned at the library
+
+  // Handle pay fine
+  const handlePayFine = async (fineId: number) => {
     try {
+      setPayingFineId(fineId);
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_BASE_URL}/loans/${loanId}/return`, {
-        method: 'PUT',
+      const response = await fetch(`${API_BASE_URL}/fines/${fineId}/pay`, {
+        method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.ok) {
-        setSuccessMessage('Book returned successfully!');
+        setSuccessMessage('Fine paid successfully!');
         setTimeout(() => setSuccessMessage(''), 3000);
-        fetchDashboardData(); // Refresh data
+        fetchDashboardData();
       } else {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to return');
+        throw new Error(data.error || 'Failed to pay fine');
       }
     } catch (err: any) {
       setError(err.message);
       setTimeout(() => setError(''), 3000);
+    } finally {
+      setPayingFineId(null);
     }
   };
 
@@ -302,7 +312,7 @@ export default function DashboardPage() {
   };
 
   // Calculate totals
-  const totalFines = fines
+  const totalFines = totalPending || fines
     .filter(f => f.status === 'pending')
     .reduce((sum, fine) => sum + fine.amount, 0);
   const activeLoansCount = loans.filter(l => l.status === 'active').length;
@@ -334,6 +344,12 @@ export default function DashboardPage() {
                   className="text-primary-600 border-b-2 border-primary-600 px-3 py-2 text-sm font-medium"
                 >
                   Dashboard
+                </Link>
+                <Link
+                  href="/profile"
+                  className="text-gray-600 hover:text-gray-900 px-3 py-2 text-sm font-medium transition-colors"
+                >
+                  Profile
                 </Link>
               </div>
               <div className="flex items-center space-x-4">
@@ -444,12 +460,17 @@ export default function DashboardPage() {
           {/* Active Loans Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center">
-                <svg className="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-                Current Loans
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                  <svg className="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                  Current Loans
+                </h2>
+                <div className="text-xs text-gray-600 bg-blue-100 px-3 py-1 rounded-full">
+                  Return books at the library
+                </div>
+              </div>
             </div>
             <div className="p-6">
               {loading ? (
@@ -544,15 +565,9 @@ export default function DashboardPage() {
                                 </svg>
                                 Request Renewal
                               </button>
-                              <button
-                                onClick={() => handleReturn(loan.id)}
-                                className="inline-flex items-center px-3 py-2 border border-green-300 text-sm font-medium rounded-lg text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-                              >
-                                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Return
-                              </button>
+                              <div className="text-xs text-gray-500 text-center px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                                Return books at the library
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -685,34 +700,142 @@ export default function DashboardPage() {
           </div>
 
           {/* Fines Section */}
-          {totalFines > 0 && (
+          {fines.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-yellow-50 to-white">
-                <h2 className="text-xl font-bold text-gray-900 flex items-center">
-                  <svg className="w-6 h-6 mr-2 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Outstanding Fines
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                    <svg className="w-6 h-6 mr-2 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Fines & Payments
+                  </h2>
+                  {totalFines > 0 && (
+                    <div className="text-right">
+                      <p className="text-sm text-gray-600">Total Pending</p>
+                      <p className="text-2xl font-bold text-yellow-600">{totalFines.toFixed(2)} EGP</p>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="p-6">
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm text-yellow-800 mb-1">Total Amount Due</p>
-                      <p className="text-4xl font-bold text-yellow-900">{totalFines.toFixed(2)} EGP</p>
-                      <p className="text-sm text-yellow-700 mt-2">
-                        You have {fines.filter(f => f.status === 'pending').length} unpaid fine(s)
-                      </p>
+                {fines.filter(f => f.status === 'pending').length > 0 && (
+                  <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800">Outstanding Balance</p>
+                        <p className="text-2xl font-bold text-yellow-900 mt-1">{totalFines.toFixed(2)} EGP</p>
+                        <p className="text-xs text-yellow-700 mt-1">
+                          {fines.filter(f => f.status === 'pending').length} unpaid fine(s)
+                        </p>
+                      </div>
                     </div>
-                    <button className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors">
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                      </svg>
-                      Pay Now
-                    </button>
                   </div>
+                )}
+
+                <div className="space-y-4">
+                  {fines.map((fine) => (
+                    <div
+                      key={fine.id}
+                      className={`border rounded-lg p-4 ${
+                        fine.status === 'pending'
+                          ? 'border-yellow-200 bg-yellow-50'
+                          : fine.status === 'paid'
+                          ? 'border-green-200 bg-green-50'
+                          : 'border-gray-200 bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-start gap-3">
+                            <div className={`rounded-lg p-2 ${
+                              fine.status === 'pending'
+                                ? 'bg-yellow-100'
+                                : fine.status === 'paid'
+                                ? 'bg-green-100'
+                                : 'bg-gray-100'
+                            }`}>
+                              <svg className={`w-5 h-5 ${
+                                fine.status === 'pending'
+                                  ? 'text-yellow-600'
+                                  : fine.status === 'paid'
+                                  ? 'text-green-600'
+                                  : 'text-gray-600'
+                              }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-semibold text-gray-900">
+                                  {fine.book_title || 'Fine'}
+                                </h3>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  fine.status === 'pending'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : fine.status === 'paid'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {fine.status === 'pending' ? 'Pending' : fine.status === 'paid' ? 'Paid' : 'Waived'}
+                                </span>
+                              </div>
+                              {fine.book_author && (
+                                <p className="text-sm text-gray-600 mb-2">by {fine.book_author}</p>
+                              )}
+                              <p className="text-sm text-gray-700 mb-2">{fine.description || `${fine.type} fine`}</p>
+                              <div className="flex items-center gap-4 text-xs text-gray-500">
+                                <span>Amount: <strong className="text-gray-900">{fine.amount.toFixed(2)} EGP</strong></span>
+                                <span>Type: {fine.type.replace('_', ' ')}</span>
+                                {fine.paid_at && (
+                                  <span>Paid: {new Date(fine.paid_at).toLocaleDateString()}</span>
+                                )}
+                                {!fine.paid_at && (
+                                  <span>Created: {new Date(fine.created_at).toLocaleDateString()}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        {fine.status === 'pending' && (
+                          <button
+                            onClick={() => handlePayFine(fine.id)}
+                            disabled={payingFineId === fine.id}
+                            className="ml-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {payingFineId === fine.id ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                </svg>
+                                Pay
+                              </>
+                            )}
+                          </button>
+                        )}
+                        {fine.status === 'paid' && (
+                          <div className="ml-4 flex items-center text-green-600">
+                            <svg className="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            <span className="text-sm font-medium">Paid</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
+
+                {fines.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No fines found</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

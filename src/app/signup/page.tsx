@@ -38,10 +38,7 @@ export default function SignUpPage() {
     setLoading(true);
 
     try {
-      // Validation (LIB-08 FR1, FR3)
       const validationErrors: string[] = [];
-
-      // Check required fields
       if (!formData.name.trim()) {
         validationErrors.push('Name is required');
       }
@@ -55,7 +52,6 @@ export default function SignUpPage() {
       if (!formData.password) {
         validationErrors.push('Password is required');
       } else {
-        // Password strength validation (LIB-08 FR3)
         const passwordValidation = validatePassword(formData.password);
         if (!passwordValidation.isValid) {
           validationErrors.push(...passwordValidation.errors);
@@ -73,12 +69,22 @@ export default function SignUpPage() {
       }
 
       // Attempt signup (LIB-08 FR1, FR4)
-      await signup(formData.email, formData.password, formData.name);
+      const result = await signup(formData.email, formData.password, formData.name);
 
-      // Success - show verification message
+      // Registration requires email verification - always redirect to verification
+      if (result?.requiresVerification) {
+        // Show email preview URL if available (for Ethereal Email)
+        if (result.emailPreviewUrl) {
+          console.log('📧 View verification email at:', result.emailPreviewUrl);
+          alert(`Verification email sent!\n\nView email at: ${result.emailPreviewUrl}\n\n(Open this URL to see the verification code)`);
+        }
+        // Redirect to verification page
+        router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+        return;
+      }
+
+      // Fallback (shouldn't happen)
       setSuccess(true);
-
-      // Redirect to login after 3 seconds
       setTimeout(() => {
         router.push('/login');
       }, 3000);

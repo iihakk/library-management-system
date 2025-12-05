@@ -105,6 +105,14 @@ exports.createHold = async (req, res) => {
   try {
     const { book_id } = req.body;
     const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Only regular users can place reservations, not staff or admin
+    if (userRole === 'staff' || userRole === 'admin') {
+      return res.status(403).json({ 
+        error: 'Staff and admin members cannot place reservations. Only regular users can reserve books.' 
+      });
+    }
 
     if (!book_id) {
       return res.status(400).json({ error: 'Book ID is required' });
