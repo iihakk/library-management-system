@@ -115,10 +115,12 @@ exports.assignBook = async (req, res) => {
       console.log(`Cancelled ${existingHolds.length} reservation(s) for user ${user_id} on book ${book_id}`);
     }
 
-    // Calculate dates
+    // Calculate dates - use policy if loan_period_days not specified
+    const loanPolicyService = require('../services/loanPolicyService');
+    const policy = await loanPolicyService.getCurrentPolicy();
     const loanDate = new Date();
     const dueDate = new Date();
-    const loanPeriod = loan_period_days ? parseInt(loan_period_days) : 14; // Default 14 days
+    const loanPeriod = loan_period_days ? parseInt(loan_period_days) : policy.loan_period_days;
     dueDate.setDate(dueDate.getDate() + loanPeriod);
 
     // Get staff member ID who is assigning the book
@@ -227,7 +229,7 @@ exports.processReturn = async (req, res) => {
     const fineService = require('../services/fineService');
     if (isOverdue) {
       daysOverdue = fineService.calculateDaysOverdue(loan.due_date);
-      fineAmount = fineService.calculateFineAmount(daysOverdue);
+      fineAmount = await fineService.calculateFineAmount(daysOverdue);
     }
 
     // Update loan

@@ -208,16 +208,19 @@ exports.advancedSearch = async (searchParams) => {
       orderBy = 'ORDER BY title ASC';
     }
 
-    // Exact ISBN search
+    // ISBN search - normalize by removing dashes/spaces and use LIKE for partial matching
     if (isbn) {
-      whereConditions.push('isbn = ?');
-      params.push(isbn);
+      // Normalize ISBN: remove dashes, spaces, and convert to uppercase for comparison
+      const normalizedIsbn = isbn.replace(/[-\s]/g, '').toUpperCase();
+      // Search with normalized ISBN (handles partial matches and different formats)
+      whereConditions.push('REPLACE(REPLACE(UPPER(isbn), "-", ""), " ", "") LIKE ?');
+      params.push(`%${normalizedIsbn}%`);
     }
 
-    // Publisher search
+    // Publisher search - case-insensitive
     if (publisher) {
-      whereConditions.push('publisher LIKE ?');
-      params.push(`%${publisher}%`);
+      whereConditions.push('LOWER(publisher) LIKE ?');
+      params.push(`%${publisher.toLowerCase()}%`);
     }
 
     // Year filters
@@ -287,42 +290,44 @@ exports.advancedSearch = async (searchParams) => {
     
     if (whereConditions.length > 0) {
       // Build count conditions - replace FULLTEXT and SOUNDEX with LIKE for simpler counting
-      const countConditions = whereConditions.map(cond => {
+      const countConditions = [];
+      let paramIndex = 0;
+      
+      for (let i = 0; i < whereConditions.length; i++) {
+        const cond = whereConditions[i];
+        
         if (cond.includes('MATCH') && query && query.trim()) {
+          // Replace complex search with simple LIKE
           const searchPattern = `%${query.trim()}%`;
           const fuzzyPatterns = generateFuzzySearchPatterns(query.trim());
           let fuzzyLike = '';
           if (fuzzyPatterns.length > 0) {
-            fuzzyLike = ' ' + fuzzyPatterns.map(() => 'OR title LIKE ? OR author LIKE ?').join(' ');
+            fuzzyLike = ' ' + fuzzyPatterns.map(() => 'OR LOWER(title) LIKE ? OR LOWER(author) LIKE ?').join(' ');
           }
-          return `(title LIKE ? OR author LIKE ? OR description LIKE ? OR isbn LIKE ? OR publisher LIKE ?${fuzzyLike})`;
-        }
-        return cond;
-      });
-      
-      countQuery += ' WHERE ' + countConditions.join(' AND ');
-      
-      // Add params for count query
-      if (query && query.trim()) {
-        const searchPattern = `%${query.trim()}%`;
-        const fuzzyPatterns = generateFuzzySearchPatterns(query.trim());
-        countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-        fuzzyPatterns.forEach(pattern => {
-          countParams.push(`%${pattern}%`, `%${pattern}%`);
-        });
-      }
-      
-      // Add other filter params (skip the search params we already added)
-      let paramIndex = query ? (4 + generateFuzzySearchPatterns(query.trim()).length * 2) : 0;
-      for (let i = 0; i < whereConditions.length; i++) {
-        if (!whereConditions[i].includes('MATCH') && !whereConditions[i].includes('SOUNDEX')) {
-          const paramCount = (whereConditions[i].match(/\?/g) || []).length;
+          countConditions.push(`(LOWER(title) LIKE ? OR LOWER(author) LIKE ? OR LOWER(description) LIKE ? OR LOWER(isbn) LIKE ? OR LOWER(publisher) LIKE ?${fuzzyLike})`);
+          
+          // Add search params
+          const lowerSearchPattern = `%${query.trim().toLowerCase()}%`;
+          countParams.push(lowerSearchPattern, lowerSearchPattern, lowerSearchPattern, lowerSearchPattern, lowerSearchPattern);
+          fuzzyPatterns.forEach(pattern => {
+            countParams.push(`%${pattern}%`, `%${pattern}%`);
+          });
+          
+          // Skip the search params in the main params array
+          const searchParamCount = 4 + fuzzyPatterns.length * 2;
+          paramIndex += searchParamCount;
+        } else {
+          // Keep other conditions as-is (ISBN, publisher, year, etc.)
+          countConditions.push(cond);
+          const paramCount = (cond.match(/\?/g) || []).length;
           if (paramCount > 0) {
             countParams.push(...params.slice(paramIndex, paramIndex + paramCount));
             paramIndex += paramCount;
           }
         }
       }
+      
+      countQuery += ' WHERE ' + countConditions.join(' AND ');
     }
 
     const [countResult] = await pool.execute(countQuery, countParams);

@@ -17,12 +17,20 @@ exports.verifyToken = async (req, res, next) => {
 
     // Get user from database
     const [users] = await pool.execute(
-      'SELECT id, uid, email, display_name, email_verified, role FROM users WHERE id = ?',
+      'SELECT id, uid, email, display_name, email_verified, role, is_active FROM users WHERE id = ?',
       [decoded.userId]
     );
 
     if (users.length === 0) {
       return res.status(401).json({ error: 'User not found' });
+    }
+
+    // Check if user is active
+    // MySQL BOOLEAN is stored as TINYINT(1): 0 = false, 1 = true
+    // Check for 0, false, null, or undefined
+    const isActive = users[0].is_active;
+    if (isActive === 0 || isActive === false || isActive === null || isActive === undefined) {
+      return res.status(403).json({ error: 'Account is deactivated. Please contact an administrator.' });
     }
 
     // Attach user to request

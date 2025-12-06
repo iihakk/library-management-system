@@ -20,7 +20,7 @@ exports.getUserLoans = async (req, res) => {
 
     // Add fine information to each loan
     const loansWithFines = await Promise.all(loans.map(async (loan) => {
-      const fineInfo = fineService.calculateLoanFine(loan);
+      const fineInfo = await fineService.calculateLoanFine(loan);
       
       // Get existing pending fine for this loan
       const [existingFines] = await pool.execute(
@@ -123,10 +123,23 @@ exports.createLoan = async (req, res) => {
       return res.status(400).json({ error: 'You already have this book on loan' });
     }
 
-    // Calculate dates
+    // Check max loans limit
+    const policy = await loanPolicyService.getCurrentPolicy();
+    const [userActiveLoans] = await pool.execute(
+      'SELECT COUNT(*) as count FROM loans WHERE user_id = ? AND status = "active"',
+      [userId]
+    );
+    
+    if (userActiveLoans[0].count >= policy.max_loans_per_user) {
+      return res.status(400).json({ 
+        error: `Maximum loan limit reached. You can only have ${policy.max_loans_per_user} active loan(s) at a time.` 
+      });
+    }
+
+    // Calculate dates using current policy
     const loanDate = new Date();
     const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 14); // 14 days loan period
+    dueDate.setDate(dueDate.getDate() + policy.loan_period_days);
 
     // Create loan
     const [result] = await pool.execute(
@@ -185,13 +198,23 @@ exports.renewLoan = async (req, res) => {
       return res.status(400).json({ error: 'Cannot renew overdue books. Please return the book and pay any fines.' });
     }
 
-    // Extend due date by 14 days
+    // Check max renewals limit
+    const policy = await loanPolicyService.getCurrentPolicy();
+    const renewalCount = loan.renewal_count || 0;
+    
+    if (renewalCount >= policy.max_renewals_per_loan) {
+      return res.status(400).json({ 
+        error: `Maximum renewal limit reached. This loan can only be renewed ${policy.max_renewals_per_loan} time(s).` 
+      });
+    }
+
+    // Extend due date by current policy loan period
     const newDueDate = new Date(loan.due_date);
-    newDueDate.setDate(newDueDate.getDate() + 14);
+    newDueDate.setDate(newDueDate.getDate() + policy.loan_period_days);
 
     await pool.execute(
-      'UPDATE loans SET due_date = ? WHERE id = ?',
-      [newDueDate, id]
+      'UPDATE loans SET due_date = ?, renewal_count = ? WHERE id = ?',
+      [newDueDate, renewalCount + 1, id]
     );
 
     // Get updated loan

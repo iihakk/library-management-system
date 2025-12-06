@@ -32,7 +32,16 @@ interface Staff {
 export default function AdminDashboardPage() {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'books' | 'users' | 'staff' | 'history' | 'reviews'>('books');
+  const [activeTab, setActiveTab] = useState<'books' | 'users' | 'staff' | 'history' | 'reviews' | 'policies'>('books');
+  const [loanPolicy, setLoanPolicy] = useState<any>(null);
+  const [showPolicyForm, setShowPolicyForm] = useState(false);
+  const [policyForm, setPolicyForm] = useState({
+    loan_period_days: '14',
+    max_loans_per_user: '5',
+    max_renewals_per_loan: '1',
+    fine_rate_per_day: '5.00',
+    grace_period_days: '0'
+  });
   const [adminHistory, setAdminHistory] = useState<any | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [books, setBooks] = useState<Book[]>([]);
@@ -49,6 +58,7 @@ export default function AdminDashboardPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [pendingReviews, setPendingReviews] = useState<any[]>([]);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [selectedUserForAction, setSelectedUserForAction] = useState<any | null>(null);
   
   // Book form state
   const [showBookForm, setShowBookForm] = useState(false);
@@ -193,18 +203,61 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Fetch loan policy
+  const fetchLoanPolicy = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/admin/loan-policy`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setLoanPolicy(data);
+        setPolicyForm({
+          loan_period_days: data.loan_period_days?.toString() || '14',
+          max_loans_per_user: data.max_loans_per_user?.toString() || '5',
+          max_renewals_per_loan: data.max_renewals_per_loan?.toString() || '1',
+          fine_rate_per_day: data.fine_rate_per_day?.toString() || '5.00',
+          grace_period_days: data.grace_period_days?.toString() || '0'
+        });
+      }
+    } catch (err: any) {
+      console.error('Error fetching loan policy:', err);
+    }
+  };
+
   useEffect(() => {
     if (user?.role === 'admin') {
       setLoading(true);
-      Promise.all([fetchBooks(), fetchStaff(), fetchUsers()]).finally(() => setLoading(false));
+      Promise.all([fetchBooks(), fetchStaff(), fetchUsers(), fetchLoanPolicy()]).finally(() => setLoading(false));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (activeTab === 'policies') {
+      fetchLoanPolicy();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab === 'users') {
       fetchUsers();
     }
   }, [userSearch, userRoleFilter, activeTab]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (selectedUserForAction && !target.closest('.relative')) {
+        setSelectedUserForAction(null);
+      }
+    };
+    if (selectedUserForAction) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [selectedUserForAction]);
 
   useEffect(() => {
     if (selectedUser) {
@@ -437,6 +490,71 @@ export default function AdminDashboardPage() {
     setEditingBook(null);
   };
 
+  // User management operations
+  const handleActivateUser = async (userId: number) => {
+    if (!confirm('Are you sure you want to activate this user account?')) return;
+    
+    setError('');
+    setSuccessMessage('');
+    setSelectedUserForAction(null);
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/activate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSuccessMessage('User activated successfully!');
+        setTimeout(() => setSuccessMessage(''), 5000);
+        fetchUsers();
+      } else {
+        setError(data.error || 'Failed to activate user');
+        setTimeout(() => setError(''), 5000);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to activate user');
+      setTimeout(() => setError(''), 5000);
+    }
+  };
+
+  const handleDeactivateUser = async (userId: number) => {
+    if (!confirm('Are you sure you want to deactivate this user account? They will not be able to log in.')) return;
+    
+    setError('');
+    setSuccessMessage('');
+    setSelectedUserForAction(null);
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/deactivate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSuccessMessage('User deactivated successfully!');
+        setTimeout(() => setSuccessMessage(''), 5000);
+        fetchUsers();
+      } else {
+        setError(data.error || 'Failed to deactivate user');
+        setTimeout(() => setError(''), 5000);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to deactivate user');
+      setTimeout(() => setError(''), 5000);
+    }
+  };
+
   // Staff operations
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -593,6 +711,16 @@ export default function AdminDashboardPage() {
                 }`}
               >
                 My History
+              </button>
+              <button
+                onClick={() => setActiveTab('policies')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'policies'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Loan Policies
               </button>
             </nav>
           </div>
@@ -857,6 +985,7 @@ export default function AdminDashboardPage() {
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                         </tr>
@@ -877,16 +1006,66 @@ export default function AdminDashboardPage() {
                                 {u.role}
                               </span>
                             </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                (u.is_active === false || u.is_active === 0) ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                              }`}>
+                                {(u.is_active === false || u.is_active === 0) ? 'Inactive' : 'Active'}
+                              </span>
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {new Date(u.created_at).toLocaleDateString()}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <button
-                                onClick={() => setSelectedUser(u)}
-                                className="text-primary-600 hover:text-primary-900"
-                              >
-                                View History
-                              </button>
+                              <div className="flex justify-end items-center space-x-2">
+                                <button
+                                  onClick={() => setSelectedUser(u)}
+                                  className="text-primary-600 hover:text-primary-900"
+                                >
+                                  View History
+                                </button>
+                                <div className="relative inline-block text-left">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedUserForAction(selectedUserForAction?.id === u.id ? null : u);
+                                    }}
+                                    className="text-gray-600 hover:text-gray-900"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                    </svg>
+                                  </button>
+                                  {selectedUserForAction?.id === u.id && (
+                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                                      <div className="py-1">
+                                        {(u.is_active === false || u.is_active === 0) ? (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleActivateUser(u.id);
+                                            }}
+                                            className="block w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50"
+                                          >
+                                            Activate Account
+                                          </button>
+                                        ) : (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeactivateUser(u.id);
+                                            }}
+                                            className="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            disabled={u.role === 'admin'}
+                                          >
+                                            Deactivate Account
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -1532,6 +1711,9 @@ export default function AdminDashboardPage() {
                                     {action.action_type === 'user_updated' ? 'Updated' :
                                      action.action_type === 'user_role_changed' ? 'Role Changed' :
                                      action.action_type === 'user_status_changed' ? 'Status Changed' :
+                                     action.action_type === 'user_activated' ? 'Activated' :
+                                     action.action_type === 'user_deactivated' ? 'Deactivated' :
+                                     action.action_type === 'user_password_reset' ? 'Password Reset' :
                                      'Modified'}
                                   </span>
                                 </td>
@@ -1577,6 +1759,201 @@ export default function AdminDashboardPage() {
               ) : (
                 <div className="bg-white rounded-lg shadow p-12 text-center">
                   <p className="text-gray-500">No history data available</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Loan Policies Tab */}
+          {activeTab === 'policies' && (
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-900">Loan Policies</h2>
+                  <p className="text-gray-600 mt-1">Configure loan rules that apply to all new loans</p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (loanPolicy) {
+                      setPolicyForm({
+                        loan_period_days: loanPolicy.loan_period_days?.toString() || '14',
+                        max_loans_per_user: loanPolicy.max_loans_per_user?.toString() || '5',
+                        max_renewals_per_loan: loanPolicy.max_renewals_per_loan?.toString() || '1',
+                        fine_rate_per_day: loanPolicy.fine_rate_per_day?.toString() || '5.00',
+                        grace_period_days: loanPolicy.grace_period_days?.toString() || '0'
+                      });
+                    }
+                    setShowPolicyForm(true);
+                  }}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Edit Policies
+                </button>
+              </div>
+
+              {/* Current Policy Display */}
+              {loanPolicy && (
+                <div className="bg-white shadow rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Current Policy</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-sm text-gray-600">Loan Period</p>
+                      <p className="text-2xl font-bold text-gray-900">{loanPolicy.loan_period_days} days</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Max Loans Per User</p>
+                      <p className="text-2xl font-bold text-gray-900">{loanPolicy.max_loans_per_user}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Max Renewals Per Loan</p>
+                      <p className="text-2xl font-bold text-gray-900">{loanPolicy.max_renewals_per_loan}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Fine Rate Per Day</p>
+                      <p className="text-2xl font-bold text-gray-900">{loanPolicy.fine_rate_per_day} EGP</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Grace Period</p>
+                      <p className="text-2xl font-bold text-gray-900">{loanPolicy.grace_period_days} days</p>
+                      <p className="text-xs text-gray-500 mt-1">No fines charged during grace period</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Note:</strong> Changes to loan policies will only apply to new loans created after the update. Existing loans will continue with their original terms.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Policy Form Modal */}
+              {showPolicyForm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <h3 className="text-xl font-bold mb-4">Edit Loan Policies</h3>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      setError('');
+                      setSuccessMessage('');
+
+                      try {
+                        const token = localStorage.getItem('auth_token');
+                        const response = await fetch(`${API_BASE_URL}/admin/loan-policy`, {
+                          method: 'PUT',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                          },
+                          body: JSON.stringify({
+                            loan_period_days: parseInt(policyForm.loan_period_days),
+                            max_loans_per_user: parseInt(policyForm.max_loans_per_user),
+                            max_renewals_per_loan: parseInt(policyForm.max_renewals_per_loan),
+                            fine_rate_per_day: parseFloat(policyForm.fine_rate_per_day),
+                            grace_period_days: parseInt(policyForm.grace_period_days)
+                          })
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok) {
+                          setSuccessMessage('Loan policies updated successfully!');
+                          setTimeout(() => setSuccessMessage(''), 5000);
+                          setShowPolicyForm(false);
+                          fetchLoanPolicy();
+                        } else {
+                          setError(data.error || 'Failed to update loan policies');
+                          setTimeout(() => setError(''), 5000);
+                        }
+                      } catch (err: any) {
+                        setError(err.message || 'Failed to update loan policies');
+                        setTimeout(() => setError(''), 5000);
+                      }
+                    }} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Loan Period (days) *</label>
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            max="365"
+                            value={policyForm.loan_period_days}
+                            onChange={(e) => setPolicyForm({ ...policyForm, loan_period_days: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">How long users can keep books (1-365 days)</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Max Loans Per User *</label>
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            max="50"
+                            value={policyForm.max_loans_per_user}
+                            onChange={(e) => setPolicyForm({ ...policyForm, max_loans_per_user: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Maximum active loans per user (1-50)</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Max Renewals Per Loan *</label>
+                          <input
+                            type="number"
+                            required
+                            min="0"
+                            max="10"
+                            value={policyForm.max_renewals_per_loan}
+                            onChange={(e) => setPolicyForm({ ...policyForm, max_renewals_per_loan: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">How many times a loan can be renewed (0-10)</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Fine Rate Per Day (EGP) *</label>
+                          <input
+                            type="number"
+                            required
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={policyForm.fine_rate_per_day}
+                            onChange={(e) => setPolicyForm({ ...policyForm, fine_rate_per_day: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Fine amount per overdue day (0-100 EGP)</p>
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Grace Period (days) *</label>
+                          <input
+                            type="number"
+                            required
+                            min="0"
+                            max="30"
+                            value={policyForm.grace_period_days}
+                            onChange={(e) => setPolicyForm({ ...policyForm, grace_period_days: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Days after due date before fines start (0-30 days)</p>
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-3 pt-4">
+                        <button
+                          type="button"
+                          onClick={() => setShowPolicyForm(false)}
+                          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                        >
+                          Update Policies
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
               )}
             </div>

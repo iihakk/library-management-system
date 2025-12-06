@@ -1,10 +1,19 @@
 const pool = require('../config/database');
+const loanPolicyService = require('./loanPolicyService');
 
-const FINE_RATE_PER_DAY = parseFloat(process.env.FINE_RATE_PER_DAY || '5.00');
-
-// Calculate fine amount for overdue days
-const calculateFineAmount = (daysOverdue) => {
-  return daysOverdue * FINE_RATE_PER_DAY;
+// Calculate fine amount for overdue days (uses current policy)
+const calculateFineAmount = async (daysOverdue) => {
+  const policy = await loanPolicyService.getCurrentPolicy();
+  const gracePeriod = policy.grace_period_days || 0;
+  
+  // Don't charge fine if within grace period
+  if (daysOverdue <= gracePeriod) {
+    return 0;
+  }
+  
+  // Calculate fine for days beyond grace period
+  const chargeableDays = daysOverdue - gracePeriod;
+  return chargeableDays * policy.fine_rate_per_day;
 };
 
 // Calculate days overdue
@@ -49,7 +58,7 @@ exports.checkAndCreateOverdueFines = async () => {
 
     for (const loan of overdueLoans) {
       const daysOverdue = calculateDaysOverdue(loan.due_date);
-      const fineAmount = calculateFineAmount(daysOverdue);
+      const fineAmount = await calculateFineAmount(daysOverdue);
 
       if (fineAmount > 0) {
         const [result] = await pool.execute(
@@ -87,13 +96,13 @@ exports.checkAndCreateOverdueFines = async () => {
 };
 
 // Calculate fine for a specific loan
-exports.calculateLoanFine = (loan) => {
+exports.calculateLoanFine = async (loan) => {
   if (loan.status === 'returned') {
     return { daysOverdue: 0, amount: 0 };
   }
 
   const daysOverdue = calculateDaysOverdue(loan.due_date);
-  const amount = calculateFineAmount(daysOverdue);
+  const amount = await calculateFineAmount(daysOverdue);
 
   return { daysOverdue, amount };
 };
@@ -116,11 +125,10 @@ exports.getUserTotalPendingFines = async (userId) => {
 };
 
 module.exports = {
-  calculateFineAmount,
+  calculateFineAmount: async (daysOverdue) => await calculateFineAmount(daysOverdue),
   calculateDaysOverdue,
   checkAndCreateOverdueFines: exports.checkAndCreateOverdueFines,
   calculateLoanFine: exports.calculateLoanFine,
-  getUserTotalPendingFines: exports.getUserTotalPendingFines,
-  FINE_RATE_PER_DAY
+  getUserTotalPendingFines: exports.getUserTotalPendingFines
 };
 

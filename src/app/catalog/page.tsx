@@ -344,52 +344,61 @@ export default function CatalogPage() {
   // Users place holds, staff assigns books
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Navigation */}
-      <nav className="bg-white shadow-sm">
+      <nav className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-gray-200/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center space-x-8">
-              <Link href="/" className="text-xl font-bold text-gray-900">
-                ULMS
+              <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                Library System
               </Link>
               <Link
                 href="/catalog"
-                className="text-primary-600 border-b-2 border-primary-600 px-3 py-2 text-sm font-medium"
+                className="text-indigo-600 font-semibold px-3 py-2 text-sm border-b-2 border-indigo-600"
               >
                 Catalog
               </Link>
+              <Link
+                href="/contact"
+                className="text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium transition-all duration-200 hover:scale-105"
+              >
+                Contact
+              </Link>
+              {user && (
+                <Link
+                  href="/dashboard"
+                  className="text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium transition-all duration-200 hover:scale-105"
+                >
+                  Dashboard
+                </Link>
+              )}
             </div>
             <div className="flex items-center space-x-4">
               {user ? (
                 <>
-                  <span className="text-gray-700">
-                    Welcome, <strong>{user.displayName || user.email}</strong>
-                  </span>
+                  <div className="text-right hidden sm:block">
+                    <p className="text-sm font-medium text-gray-900">{user.displayName || user.email}</p>
+                    <p className="text-xs text-gray-500">{user.email}</p>
+                  </div>
                   <Link
                     href="/dashboard"
-                    className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                    className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                   >
                     Dashboard
-                  </Link>
-                  <Link
-                    href="/profile"
-                    className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-                  >
-                    Profile
                   </Link>
                 </>
               ) : (
                 <>
                   <Link
                     href="/login"
-                    className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                    className="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200"
                   >
                     Sign In
                   </Link>
                   <Link
                     href="/signup"
-                    className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                    className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                   >
                     Sign Up
                   </Link>
@@ -404,12 +413,16 @@ export default function CatalogPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Library Catalog</h1>
-          <p className="text-gray-600">Browse and search our collection of books</p>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-3">
+            <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              Library Catalog
+            </span>
+          </h1>
+          <p className="text-lg text-gray-600">Browse available books</p>
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Search */}
             <div className="md:col-span-2 relative">
@@ -733,9 +746,9 @@ export default function CatalogPage() {
                               book.book_type === 'both' ? 'bg-purple-100 text-purple-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {book.book_type === 'electronic' ? '📱 Electronic' :
-                               book.book_type === 'both' ? '📚 Both' :
-                               '📖 Physical'}
+                              {book.book_type === 'electronic' ? 'Electronic' :
+                               book.book_type === 'both' ? 'Both' :
+                               'Physical'}
                             </span>
                           )}
                         </div>

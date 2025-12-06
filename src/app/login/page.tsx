@@ -61,21 +61,29 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
+        <div className="text-center">
+          <Link href="/" className="inline-block mb-6">
+            <span className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              Library System
+            </span>
+          </Link>
+          <h2 className="text-4xl font-extrabold text-gray-900 mb-2">
+            Sign In
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="text-gray-600">
+            Enter your email and password
+          </p>
+          <p className="mt-4 text-sm text-gray-500">
             Don't have an account?{' '}
-            <Link href="/signup" className="font-medium text-primary-600 hover:text-primary-500">
-              Sign up
+            <Link href="/signup" className="font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+              Sign up here
             </Link>
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6 bg-white rounded-2xl shadow-xl p-8 border border-gray-100" onSubmit={handleSubmit}>
           {/* Error Message (LIB-09 FR2: Generic error) */}
           {error && (
             <div className="rounded-md bg-red-50 p-4">
@@ -115,7 +123,7 @@ export default function LoginPage() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-4 py-3 border-2 border-gray-200 placeholder-gray-400 text-gray-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-all duration-200"
                 placeholder="you@example.com"
               />
             </div>
@@ -133,7 +141,7 @@ export default function LoginPage() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-4 py-3 border-2 border-gray-200 placeholder-gray-400 text-gray-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-all duration-200"
                 placeholder="••••••••"
               />
             </div>
@@ -153,7 +161,7 @@ export default function LoginPage() {
             </div>
 
             <div className="text-sm">
-              <Link href="/forgot-password" className="font-medium text-primary-600 hover:text-primary-500">
+              <Link href="/forgot-password" className="font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
                 Forgot your password?
               </Link>
             </div>
@@ -163,7 +171,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base font-semibold rounded-xl text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
             >
               {loading ? (
                 <span className="flex items-center">

@@ -128,7 +128,7 @@ exports.login = async (req, res) => {
 
     // Find user
     const [users] = await pool.execute(
-      'SELECT id, uid, email, password, display_name, email_verified, role FROM users WHERE email = ?',
+      'SELECT id, uid, email, password, display_name, email_verified, role, is_active FROM users WHERE email = ?',
       [email]
     );
 
@@ -139,6 +139,16 @@ exports.login = async (req, res) => {
     }
 
     const user = users[0];
+
+    // Check if account is active
+    // MySQL BOOLEAN is stored as TINYINT(1): 0 = false, 1 = true
+    // Check for 0, false, null, or undefined
+    const isActive = user.is_active;
+    if (isActive === 0 || isActive === false || isActive === null || isActive === undefined) {
+      return res.status(403).json({ 
+        error: 'Your account has been deactivated. Please contact an administrator.' 
+      });
+    }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -197,7 +207,7 @@ exports.verifyToken = async (req, res) => {
 
     // Get user from database
     const [users] = await pool.execute(
-      'SELECT id, uid, email, display_name, email_verified, role FROM users WHERE id = ?',
+      'SELECT id, uid, email, display_name, email_verified, role, is_active FROM users WHERE id = ?',
       [decoded.userId]
     );
 
@@ -206,6 +216,16 @@ exports.verifyToken = async (req, res) => {
     }
 
     const user = users[0];
+
+    // Check if account is active
+    // MySQL BOOLEAN is stored as TINYINT(1): 0 = false, 1 = true
+    // Check for 0, false, null, or undefined
+    const isActive = user.is_active;
+    if (isActive === 0 || isActive === false || isActive === null || isActive === undefined) {
+      return res.status(403).json({ 
+        error: 'Your account has been deactivated. Please contact an administrator.' 
+      });
+    }
 
     res.json({
       user: {
@@ -283,7 +303,7 @@ exports.getAllUsers = async (req, res) => {
     const limitNum = parseInt(limit);
     const offsetNum = parseInt(offset);
 
-    let query = 'SELECT id, uid, email, display_name, role, email_verified, created_at FROM users WHERE 1=1';
+    let query = 'SELECT id, uid, email, display_name, role, email_verified, is_active, created_at FROM users WHERE 1=1';
     const params = [];
 
     if (search) {
@@ -341,7 +361,7 @@ exports.getUserById = async (req, res) => {
     const { id } = req.params;
 
     const [users] = await pool.execute(
-      'SELECT id, uid, email, display_name, role, email_verified, created_at FROM users WHERE id = ?',
+      'SELECT id, uid, email, display_name, role, email_verified, is_active, created_at FROM users WHERE id = ?',
       [id]
     );
 
@@ -528,7 +548,7 @@ exports.requestPasswordReset = async (req, res) => {
 
     // Find user by email
     const [users] = await pool.execute(
-      'SELECT id, email, display_name FROM users WHERE email = ?',
+      'SELECT id, email, display_name, is_active FROM users WHERE email = ?',
       [email]
     );
 
@@ -540,6 +560,14 @@ exports.requestPasswordReset = async (req, res) => {
     }
 
     const user = users[0];
+
+    // Check if account is active - don't reveal account status for security
+    const isActive = user.is_active;
+    if (isActive === 0 || isActive === false || isActive === null || isActive === undefined) {
+      return res.json({
+        message: 'If an account with that email exists, a password reset code has been sent.'
+      });
+    }
 
     // Generate reset code
     const resetCode = generateVerificationCode();
@@ -644,7 +672,7 @@ exports.resetPassword = async (req, res) => {
 
     // Find valid reset code
     const [codes] = await pool.execute(
-      `SELECT evc.*, u.id as user_id, u.display_name 
+      `SELECT evc.*, u.id as user_id, u.display_name, u.is_active 
        FROM email_verification_codes evc
        JOIN users u ON evc.user_id = u.id
        WHERE evc.email = ? AND evc.code = ? AND evc.verified = FALSE AND evc.expires_at > NOW()`,
@@ -658,6 +686,15 @@ exports.resetPassword = async (req, res) => {
     }
 
     const verificationRecord = codes[0];
+
+    // Check if account is active
+    // MySQL BOOLEAN is stored as TINYINT(1): 0 = false, 1 = true
+    const isActive = verificationRecord.is_active;
+    if (isActive === 0 || isActive === false || isActive === null || isActive === undefined) {
+      return res.status(403).json({ 
+        error: 'Your account has been deactivated. Please contact an administrator.' 
+      });
+    }
 
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
