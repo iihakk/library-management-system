@@ -6,12 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "setup:admin": "node scripts/create-admin-user.js",
-    "migrate:role": "node scripts/add-role-migration.js",
-    "migrate:book-type": "node scripts/add-book-type-migration.js",
-    "migrate:email-verification": "node scripts/add-email-verification-migration.js",
-    "setup:env": "node scripts/setup-env.js",
-    "setup:gmail": "node scripts/setup-gmail.js"
+    "setup:admin": "node scripts/create-admin-user.js"
   },
   "keywords": [],
   "author": "",

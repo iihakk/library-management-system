@@ -198,12 +198,12 @@ export default function CatalogPage() {
     fetchBooks();
   }, [pagination.page, selectedCategory]);
   
-  // Refetch books when user changes (e.g., after login or refresh)
-  // This ensures holds are fetched after user loads on page refresh
+  // refetch books when user changes (like after login)
+  // makes sure holds are fetched after user loads on refresh
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
     if (token) {
-      // Small delay to ensure user state is updated if it's being loaded
+      // small delay to make sure user state is loaded
       const timer = setTimeout(() => {
         fetchBooks();
       }, 100);
@@ -211,7 +211,7 @@ export default function CatalogPage() {
     }
   }, [user]);
 
-  // Debounce search
+  // debounce the search (wait a bit before searching)
   useEffect(() => {
     const timer = setTimeout(() => {
       if (pagination.page === 1) {
@@ -224,7 +224,7 @@ export default function CatalogPage() {
     return () => clearTimeout(timer);
   }, [searchTerm, advancedFilters, selectedCategory]);
 
-  // Fetch suggestions
+  // fetch search suggestions
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchTerm) {

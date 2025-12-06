@@ -1,7 +1,7 @@
 const pool = require('../config/database');
 const searchService = require('../services/searchService');
 
-// Get all books with advanced search
+// get all books - supports advanced search
 exports.getAllBooks = async (req, res) => {
   try {
     const {
@@ -21,7 +21,7 @@ exports.getAllBooks = async (req, res) => {
       limit = 20
     } = req.query;
 
-    // Use advanced search if any advanced parameters are provided
+    // use advanced search if any advanced params are there
     const useAdvancedSearch = query || isbn || publisher || year || yearFrom || yearTo || 
                               bookType || availableOnly || minRating;
 
@@ -42,7 +42,7 @@ exports.getAllBooks = async (req, res) => {
         limit
       });
 
-      // Add reserved count and rating info
+      // add reserved count and rating info to each book
       const booksWithReserved = await Promise.all(searchResult.books.map(async (book) => {
         const [reservedCount] = await pool.execute(
           'SELECT COUNT(*) as count FROM holds WHERE book_id = ? AND status IN ("pending", "available")',
@@ -70,7 +70,7 @@ exports.getAllBooks = async (req, res) => {
         }
       });
     } else {
-      // Fallback to simple search for backward compatibility
+      // fallback to simple search (for backwards compat)
       const offset = (page - 1) * limit;
       let queryStr = 'SELECT * FROM books WHERE 1=1';
       const params = [];
@@ -97,7 +97,7 @@ exports.getAllBooks = async (req, res) => {
 
       const [books] = await pool.execute(queryStr, params);
 
-      // Add reserved count and rating info for each book
+      // add reserved count and rating info to each book
       const booksWithReserved = await Promise.all(books.map(async (book) => {
         const [reservedCount] = await pool.execute(
           'SELECT COUNT(*) as count FROM holds WHERE book_id = ? AND status IN ("pending", "available")',
@@ -115,7 +115,7 @@ exports.getAllBooks = async (req, res) => {
         };
       }));
 
-      // Get total count
+      // get total count for pagination
       let countQuery = 'SELECT COUNT(*) as total FROM books WHERE 1=1';
       const countParams = [];
 
@@ -184,7 +184,7 @@ exports.getBookById = async (req, res) => {
       return res.status(404).json({ error: 'Book not found' });
     }
 
-    // Add reserved count
+    // add reserved count
     const [reservedCount] = await pool.execute(
       'SELECT COUNT(*) as count FROM holds WHERE book_id = ? AND status IN ("pending", "available")',
       [id]

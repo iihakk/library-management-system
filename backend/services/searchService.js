@@ -1,6 +1,6 @@
 const pool = require('../config/database');
 
-// Calculate Levenshtein distance for fuzzy matching
+// calc levenshtein distance - for fuzzy matching stuff
 function levenshteinDistance(str1, str2) {
   const len1 = str1.length;
   const len2 = str2.length;
@@ -31,7 +31,7 @@ function levenshteinDistance(str1, str2) {
   return matrix[len1][len2];
 }
 
-// Calculate similarity percentage
+// calc how similar two strings are (returns percentage)
 function calculateSimilarity(str1, str2) {
   const maxLen = Math.max(str1.length, str2.length);
   if (maxLen === 0) return 100;
@@ -39,64 +39,64 @@ function calculateSimilarity(str1, str2) {
   return ((maxLen - distance) / maxLen) * 100;
 }
 
-// Generate fuzzy search patterns for common typos
+// generate patterns for typos - handles stuff like yamsine -> yasmine
 function generateFuzzySearchPatterns(searchTerm) {
   const patterns = [];
   const term = searchTerm.toLowerCase();
   
-  // Keyboard adjacency map (QWERTY layout - letters physically next to each other)
+  // keyboard map - letters that are next to each other on keyboard (qwerty layout)
   const keyboardAdjacent = {
-    // Top row: q-w-e-r-t-y-u-i-o-p
+    // top row keys
     'q': ['w'], 'w': ['q', 'e'], 'e': ['w', 'r'], 'r': ['e', 't'], 
     't': ['r', 'y'], 'y': ['t', 'u'], 'u': ['y', 'i'], 'i': ['u', 'o'], 
     'o': ['i', 'p'], 'p': ['o'],
-    // Middle row: a-s-d-f-g-h-j-k-l
+    // middle row
     'a': ['s'], 's': ['a', 'd'], 'd': ['s', 'f'], 'f': ['d', 'g'], 
     'g': ['f', 'h'], 'h': ['g', 'j'], 'j': ['h', 'k'], 'k': ['j', 'l'], 
     'l': ['k'],
-    // Bottom row: z-x-c-v-b-n-m
+    // bottom row
     'z': ['x'], 'x': ['z', 'c'], 'c': ['x', 'v'], 'v': ['c', 'b'], 
     'b': ['v', 'n'], 'n': ['b', 'm'], 'm': ['n']
   };
   
-  // Common character substitutions (vowels and similar-sounding consonants)
+  // common char swaps - vowels and consonants that sound similar
   const substitutions = {
-    // Vowels
+    // vowels
     'a': ['e', 'i', 'o'],
     'e': ['a', 'i', 'o'],
     'i': ['a', 'e', 'y'],
     'o': ['a', 'e', 'u'],
-    'u': ['o', 'a', 'y'], // Added y (keyboard adjacent)
-    'y': ['i', 'e', 'u', 't'], // Added u and t (keyboard adjacent)
-    // Similar-sounding consonants (common keyboard typos)
-    'b': ['d', 'p', 'v', 'n'], // Added n (keyboard adjacent)
-    'd': ['b', 't', 'p', 's', 'f'], // Added s, f (keyboard adjacent)
-    'p': ['b', 'd', 'o'], // Added o (keyboard adjacent)
-    't': ['d', 'r', 'y'], // Added r, y (keyboard adjacent)
-    'v': ['b', 'f', 'c'], // Added c (keyboard adjacent)
-    'f': ['v', 'ph', 'd', 'g'], // Added d, g (keyboard adjacent)
+    'u': ['o', 'a', 'y'], // y is next to u on keyboard
+    'y': ['i', 'e', 'u', 't'], // u and t are nearby
+    // consonants that get mixed up alot
+    'b': ['d', 'p', 'v', 'n'], // n is close
+    'd': ['b', 't', 'p', 's', 'f'], // s and f nearby
+    'p': ['b', 'd', 'o'], // o is next to p
+    't': ['d', 'r', 'y'], // r and y are close
+    'v': ['b', 'f', 'c'], // c is nearby
+    'f': ['v', 'ph', 'd', 'g'], // d and g are close
     'ph': ['f'],
-    // Other common substitutions
-    's': ['z', 'c', 'x', 'a', 'd'], // Added a, d (keyboard adjacent)
-    'z': ['s', 'x'], // Added x (keyboard adjacent)
-    'c': ['s', 'k', 'x', 'v'], // Added x, v (keyboard adjacent)
-    'k': ['c', 'j', 'l'], // Added j, l (keyboard adjacent)
-    'g': ['j', 'f', 'h'], // Added f, h (keyboard adjacent)
-    'j': ['g', 'h', 'k'], // Added h, k (keyboard adjacent)
-    'm': ['n'], // n is already keyboard adjacent
-    'n': ['m', 'b'], // Added b (keyboard adjacent)
-    'r': ['l', 'e', 't'], // Added e, t (keyboard adjacent)
-    'l': ['r', 'k'], // Added k (keyboard adjacent)
-    'w': ['v', 'e', 'q'], // Added e, q (keyboard adjacent)
-    'x': ['s', 'z', 'c'], // Added s, z, c (keyboard adjacent)
-    'h': ['g', 'j'] // Added g, j (keyboard adjacent)
+    // other common ones
+    's': ['z', 'c', 'x', 'a', 'd'], // a and d nearby
+    'z': ['s', 'x'], // x is close
+    'c': ['s', 'k', 'x', 'v'], // x and v nearby
+    'k': ['c', 'j', 'l'], // j and l are close
+    'g': ['j', 'f', 'h'], // f and h nearby
+    'j': ['g', 'h', 'k'], // h and k close
+    'm': ['n'], // n is right next to it
+    'n': ['m', 'b'], // b is nearby
+    'r': ['l', 'e', 't'], // e and t are close
+    'l': ['r', 'k'], // k is nearby
+    'w': ['v', 'e', 'q'], // e and q are close
+    'x': ['s', 'z', 'c'], // s, z, c nearby
+    'h': ['g', 'j'] // g and j are close
   };
   
-  // Generate variations by substituting similar characters at each position
+  // try swapping chars at each position to find typos
   for (let i = 0; i < term.length; i++) {
     const char = term[i];
     
-    // Add keyboard-adjacent substitutions (very common typos)
+    // check keyboard adjacent keys (people hit wrong key alot)
     if (keyboardAdjacent[char]) {
       keyboardAdjacent[char].forEach(adj => {
         const variant = term.substring(0, i) + adj + term.substring(i + 1);
@@ -106,7 +106,7 @@ function generateFuzzySearchPatterns(searchTerm) {
       });
     }
     
-    // Add phonetic/similar-sounding substitutions
+    // also check similar sounding chars
     if (substitutions[char]) {
       substitutions[char].forEach(sub => {
         const variant = term.substring(0, i) + sub + term.substring(i + 1);
@@ -117,7 +117,7 @@ function generateFuzzySearchPatterns(searchTerm) {
     }
   }
   
-  // Also try adjacent character swaps (common typing errors)
+  // also try swapping adjacent chars (like typing "teh" instead of "the")
   for (let i = 0; i < term.length - 1; i++) {
     const swapped = term.substring(0, i) + term[i + 1] + term[i] + term.substring(i + 2);
     if (swapped !== term && !patterns.includes(swapped)) {
@@ -125,11 +125,11 @@ function generateFuzzySearchPatterns(searchTerm) {
     }
   }
   
-  // Limit to most relevant patterns (avoid too many)
+  // only return first 8 patterns, too many slows things down
   return patterns.slice(0, 8);
 }
 
-// Advanced search with full-text and fuzzy matching
+// advanced search - does fulltext and fuzzy matching stuff
 exports.advancedSearch = async (searchParams) => {
   try {
     const {
@@ -153,25 +153,25 @@ exports.advancedSearch = async (searchParams) => {
     const params = [];
     let orderBy = '';
 
-    // Full-text search on query with fuzzy matching
+    // fulltext search with fuzzy stuff
     if (query && query.trim()) {
       const searchTerm = query.trim();
       const mysql = require('mysql2');
       const escapedTerm = mysql.escape(searchTerm);
       const searchPattern = `%${searchTerm}%`;
       
-      // Generate fuzzy variations for common typos (e.g., yamsine -> yasmine)
+      // generate fuzzy patterns for typos like yamsine -> yasmine
       const fuzzyPatterns = generateFuzzySearchPatterns(searchTerm);
       
-      // Build fuzzy LIKE conditions
+      // build the LIKE conditions for fuzzy matching
       let fuzzyLikeConditions = '';
       if (fuzzyPatterns.length > 0) {
         fuzzyLikeConditions = ' ' + fuzzyPatterns.map(() => 'OR LOWER(title) LIKE ? OR LOWER(author) LIKE ?').join(' ');
       }
       
-      // Use FULLTEXT search with fuzzy matching
-      // Include SOUNDEX for phonetic matching (handles typos like yamsine -> yasmine, bracula -> dracula)
-      // Use LOWER() for case-insensitive matching
+      // use FULLTEXT search with fuzzy matching
+      // SOUNDEX helps with phonetic stuff (catches typos like bracula -> dracula)
+      // LOWER() makes it case insensitive
       whereConditions.push(`(
         MATCH(title, author) AGAINST(${escapedTerm} IN NATURAL LANGUAGE MODE)
         OR MATCH(description) AGAINST(${escapedTerm} IN NATURAL LANGUAGE MODE)
@@ -186,16 +186,16 @@ exports.advancedSearch = async (searchParams) => {
         ${fuzzyLikeConditions}
       )`);
       
-      // Add base patterns (lowercase for case-insensitive matching)
+      // add base search patterns (lowercase)
       const lowerSearchPattern = `%${searchTerm.toLowerCase()}%`;
       params.push(lowerSearchPattern, lowerSearchPattern, searchPattern, searchPattern);
       
-      // Add fuzzy patterns (already lowercase from generateFuzzySearchPatterns)
+      // add the fuzzy patterns (already lowercase)
       fuzzyPatterns.forEach(pattern => {
         params.push(`%${pattern}%`, `%${pattern}%`);
       });
       
-      // Add relevance score for ordering (prioritize exact matches)
+      // order by relevance - exact matches first
       orderBy = `ORDER BY 
         (CASE 
           WHEN LOWER(title) LIKE ${mysql.escape(`%${searchTerm.toLowerCase()}%`)} OR LOWER(author) LIKE ${mysql.escape(`%${searchTerm.toLowerCase()}%`)} THEN 10
@@ -208,22 +208,22 @@ exports.advancedSearch = async (searchParams) => {
       orderBy = 'ORDER BY title ASC';
     }
 
-    // ISBN search - normalize by removing dashes/spaces and use LIKE for partial matching
+    // ISBN search - remove dashes/spaces and do partial match
     if (isbn) {
-      // Normalize ISBN: remove dashes, spaces, and convert to uppercase for comparison
+      // normalize isbn - strip dashes and spaces, make uppercase
       const normalizedIsbn = isbn.replace(/[-\s]/g, '').toUpperCase();
-      // Search with normalized ISBN (handles partial matches and different formats)
+      // search with normalized isbn (works with partial matches too)
       whereConditions.push('REPLACE(REPLACE(UPPER(isbn), "-", ""), " ", "") LIKE ?');
       params.push(`%${normalizedIsbn}%`);
     }
 
-    // Publisher search - case-insensitive
+    // publisher search - case insensitive
     if (publisher) {
       whereConditions.push('LOWER(publisher) LIKE ?');
       params.push(`%${publisher.toLowerCase()}%`);
     }
 
-    // Year filters
+    // year filtering
     if (year) {
       whereConditions.push('publication_year = ?');
       params.push(year);
@@ -238,7 +238,7 @@ exports.advancedSearch = async (searchParams) => {
       }
     }
 
-    // Book type filter
+    // book type filter
     if (bookType && bookType !== 'all') {
       if (bookType === 'both') {
         whereConditions.push("book_type IN ('both', 'physical', 'electronic')");
@@ -248,24 +248,24 @@ exports.advancedSearch = async (searchParams) => {
       }
     }
 
-    // Availability filter
+    // only show available books if this is set
     if (availableOnly === 'true' || availableOnly === true) {
       whereConditions.push('available_copies > 0');
     }
 
-    // Category filter
+    // category filter
     if (category) {
       whereConditions.push('category = ?');
       params.push(category);
     }
 
-    // Author filter
+    // author filter
     if (author) {
       whereConditions.push('author LIKE ?');
       params.push(`%${author}%`);
     }
 
-    // Minimum rating filter
+    // min rating filter
     if (minRating) {
       whereConditions.push('average_rating >= ?');
       params.push(parseFloat(minRating));
@@ -277,19 +277,19 @@ exports.advancedSearch = async (searchParams) => {
       queryStr += ' WHERE ' + whereConditions.join(' AND ');
     }
     
-    // LIMIT and OFFSET cannot use placeholders in MySQL prepared statements
+    // LIMIT and OFFSET cant use ? placeholders in mysql, have to interpolate
     const limitNum = parseInt(limit);
     const offsetNum = parseInt(offset);
     queryStr += ` ${orderBy} LIMIT ${limitNum} OFFSET ${offsetNum}`;
 
     const [books] = await pool.execute(queryStr, params);
 
-    // Get total count - rebuild query with same conditions but simpler for counting
+    // get total count - rebuild query but simpler (for pagination)
     let countQuery = 'SELECT COUNT(*) as total FROM books';
     const countParams = [];
     
     if (whereConditions.length > 0) {
-      // Build count conditions - replace FULLTEXT and SOUNDEX with LIKE for simpler counting
+      // build count query - replace FULLTEXT/SOUNDEX with simple LIKE
       const countConditions = [];
       let paramIndex = 0;
       
@@ -297,7 +297,7 @@ exports.advancedSearch = async (searchParams) => {
         const cond = whereConditions[i];
         
         if (cond.includes('MATCH') && query && query.trim()) {
-          // Replace complex search with simple LIKE
+          // replace the complex search stuff with simple LIKE
           const searchPattern = `%${query.trim()}%`;
           const fuzzyPatterns = generateFuzzySearchPatterns(query.trim());
           let fuzzyLike = '';
@@ -306,18 +306,18 @@ exports.advancedSearch = async (searchParams) => {
           }
           countConditions.push(`(LOWER(title) LIKE ? OR LOWER(author) LIKE ? OR LOWER(description) LIKE ? OR LOWER(isbn) LIKE ? OR LOWER(publisher) LIKE ?${fuzzyLike})`);
           
-          // Add search params
+          // add search params
           const lowerSearchPattern = `%${query.trim().toLowerCase()}%`;
           countParams.push(lowerSearchPattern, lowerSearchPattern, lowerSearchPattern, lowerSearchPattern, lowerSearchPattern);
           fuzzyPatterns.forEach(pattern => {
             countParams.push(`%${pattern}%`, `%${pattern}%`);
           });
           
-          // Skip the search params in the main params array
+          // skip search params in main array (already added above)
           const searchParamCount = 4 + fuzzyPatterns.length * 2;
           paramIndex += searchParamCount;
         } else {
-          // Keep other conditions as-is (ISBN, publisher, year, etc.)
+          // keep other conditions as is (isbn, publisher, year etc)
           countConditions.push(cond);
           const paramCount = (cond.match(/\?/g) || []).length;
           if (paramCount > 0) {
@@ -346,7 +346,7 @@ exports.advancedSearch = async (searchParams) => {
   }
 };
 
-// Get search suggestions (for autocomplete) with fuzzy matching
+// get search suggestions for autocomplete - uses fuzzy matching
 exports.getSearchSuggestions = async (query, limit = 10) => {
   try {
     if (!query || query.length < 2) {
@@ -361,7 +361,7 @@ exports.getSearchSuggestions = async (query, limit = 10) => {
     
     const limitNum = parseInt(limit);
     
-    // Build query with fuzzy matching (case-insensitive)
+    // build query with fuzzy matching (case insensitive)
     let suggestionQuery = `SELECT DISTINCT title, author, isbn, publisher
        FROM books
        WHERE LOWER(title) LIKE ? 
@@ -376,7 +376,7 @@ exports.getSearchSuggestions = async (query, limit = 10) => {
     const lowerSearchPattern = `%${searchTerm.toLowerCase()}%`;
     const suggestionParams = [lowerSearchPattern, lowerSearchPattern, searchPattern, searchPattern];
     
-    // Add fuzzy patterns
+    // add fuzzy patterns
     if (fuzzyPatterns.length > 0) {
       suggestionQuery += ' ' + fuzzyPatterns.map(() => 'OR LOWER(title) LIKE ? OR LOWER(author) LIKE ?').join(' ');
       fuzzyPatterns.forEach(pattern => {
